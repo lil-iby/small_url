@@ -74,7 +74,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Scan de l'image (Trivy), échec si vulnérabilité corrigeable
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: url-shortener:ci
           severity: CRITICAL,HIGH
@@ -82,7 +82,7 @@ jobs:
           exit-code: "1"
 
       - name: Scan de la configuration (Dockerfile, compose, Terraform)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -128,6 +128,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install ansible-core ansible-lint
+      - run: ansible-galaxy collection install community.general
       - name: Ansible lint et syntaxe
         working-directory: infra/ansible
         run: |
