@@ -73,7 +73,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Scan de l'image (Trivy) : échec si vulnérabilité critique corrigeable
+      - name: Scan de l'image (Trivy), échec si vulnérabilité corrigeable
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: url-shortener:ci
