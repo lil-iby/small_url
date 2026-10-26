@@ -133,7 +133,7 @@ jobs:
         run: |
           ansible-lint playbook.yml
           ansible-playbook --syntax-check -i inventory.example.ini playbook.yml
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
       - name: Terraform fmt et validate
         working-directory: infra/terraform
         run: |
