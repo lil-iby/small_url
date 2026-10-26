@@ -6,3 +6,6 @@ __pycache__/
 *.db
 .env
 .coverage
+
+# Notes personnelles (non publiées)
+docs/EXPLICATIONS.md

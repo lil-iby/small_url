@@ -23,8 +23,7 @@ flowchart LR
   graf[Grafana] --> prom
 ```
 
-Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Politique de sécurité : [SECURITY.md](SECURITY.md) ·
-Fiche d'entretien : [docs/EXPLICATIONS.md](docs/EXPLICATIONS.md).
+Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Politique de sécurité : [SECURITY.md](SECURITY.md).
 
 ## API
 
