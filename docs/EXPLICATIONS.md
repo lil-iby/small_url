@@ -13,15 +13,27 @@ Un service web qui transforme une URL longue en lien court, avec des clics compt
 
 *Questions probables :* « Pourquoi 302 et pas 301 ? » (cache navigateur) ; « Que se passe-t-il si deux codes générés sont identiques ? » (contrainte d'unicité, nouvelle tentative) ; « Comment évites-tu les redirections dangereuses ? » (validation du schéma d'URL).
 
-**2. Les tests (`tests/`)**
-9 tests automatiques qui vérifient les cas nominaux et les cas d'attaque (URL `javascript:`, codes réservés, doublons, 404). Ils utilisent une base SQLite en mémoire : rapides, sans dépendance.
+**2. Sécurité (`security.py`, `SECURITY.md`)**
+Clé API comparée en temps constant, limitation de débit (429 + `Retry-After`), en-têtes durcis (CSP, nosniff, DENY), domaines bloqués, démarrage refusé en production sans clé. *Question probable :* « Pourquoi `hmac.compare_digest` ? » (évite les attaques par mesure du temps de réponse).
 
-**3. Docker (`Dockerfile`, `docker-compose.yml`)**
-- Build en deux étapes : on installe les dépendances dans une première image, puis on ne copie dans l'image finale que le nécessaire (image plus petite, moins de surface d'attaque).
-- Utilisateur non root : si l'application est compromise, l'attaquant n'a pas les droits root dans le conteneur.
-- `HEALTHCHECK` : Docker sait si l'application répond.
-- `docker-compose` : lance l'application et PostgreSQL ; l'application attend que la base soit prête (`depends_on` + `healthcheck`).
+**3. Tests (`tests/`)**
+32 tests, couverture 99 % (seuil CI à 90 %) : cas nominaux, cas d'attaque, limiteur, migrations Alembic jouées sur une base vierge, et un test à 200 clics concurrents sur PostgreSQL réel (exécuté en CI).
 
-*Questions probables :* « Pourquoi un build multi-étapes ? » ; « Pourquoi ne pas mettre le mot de passe dans l'image ? » (variables d'environnement, secrets hors du code).
+**4. Base de données (`migrations/`)**
+Alembic versionne le schéma ; le conteneur applique `alembic upgrade head` au démarrage. *Question :* « Et avec plusieurs réplicas ? » (job de migration séparé, voir ADR-4).
 
-**4. À venir** : CI/CD (GitHub Actions), analyses de sécurité (CodeQL/Bandit, Trivy), Ansible, supervision (Prometheus/Grafana). Chaque brique aura sa fiche ici.
+**5. Docker (`Dockerfile`, `docker-compose.yml`)**
+Build multi-étapes, utilisateur non root, système de fichiers en lecture seule, `cap_drop: ALL`, `no-new-privileges`, `HEALTHCHECK`. Profil `monitoring` : Prometheus + Grafana préconfigurés.
+
+**6. Observabilité (`observability.py`, `monitoring/`)**
+Journaux JSON sans IP, `X-Request-ID`, métriques par route, 3 alertes (service down, taux d'erreur 5xx > 5 %, p95 > 500 ms), tableau de bord Grafana.
+
+**7. CI/CD (`.github/workflows/`)**
+Lint, tests avec PostgreSQL, Bandit, pip-audit, CodeQL, Trivy (image et configuration), test de bout en bout via compose, publication GHCR sur `main`, Dependabot. *Question :* « Que se passe-t-il si une dépendance a une faille ? » (pip-audit et Trivy font échouer le pipeline).
+
+**8. Infrastructure en code (`infra/`)**
+Terraform (serveur + pare-feu), Ansible (Docker, pare-feu UFW, secrets en 0600, Vault). Validé en CI mais pas appliqué sur un vrai serveur : à dire franchement en entretien.
+
+## Ce que je sais expliquer et ce que je ne prétends pas
+- Je prétends : concevoir, tester, sécuriser, conteneuriser, automatiser une chaîne complète pour un service.
+- Je ne prétends pas : avoir opéré ce service en production réelle ni géré de la montée en charge.

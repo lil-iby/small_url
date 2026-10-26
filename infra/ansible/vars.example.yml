@@ -1,0 +1,6 @@
+---
+# Exemple : ne jamais committer de vrais secrets.
+# En vrai : copier en vars.yml puis `ansible-vault encrypt vars.yml`.
+shortener_base_url: https://liens.example.com
+shortener_api_keys: remplacer-par-une-cle-longue-et-aleatoire
+shortener_db_password: remplacer-par-un-mot-de-passe-long

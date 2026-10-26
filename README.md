@@ -1,19 +1,40 @@
 # URL Shortener : projet DevSecOps
 
 Un raccourcisseur d'URL volontairement simple, construit pour illustrer une chaîne DevSecOps complète :
-conteneurs, intégration continue, analyses de sécurité, déploiement automatisé et supervision.
+code testé, sécurisé, conteneurisé, supervisé, avec pipeline CI/CD et infrastructure décrite en code.
 
-> État du projet : étape 1 (application + tests) et étape 2 (conteneurs) terminées.
-> À venir : CI/CD GitHub Actions avec analyses de sécurité, Ansible, supervision Prometheus/Grafana.
+![CI](../../actions/workflows/ci.yml/badge.svg)
+![CodeQL](../../actions/workflows/codeql.yml/badge.svg)
 
-## Fonctionnalités
+> Remplacer `../..` par `https://github.com/<utilisateur>/<depot>` si les badges ne s'affichent pas hors GitHub.
+
+## Vue d'ensemble
+
+```mermaid
+flowchart LR
+  dev[Développeur] -->|push / PR| ci[GitHub Actions]
+  ci -->|ruff, pytest + PostgreSQL, Bandit, pip-audit, CodeQL| qa{Contrôles}
+  qa -->|OK| img[Image Docker + scan Trivy]
+  img -->|main| ghcr[(GHCR)]
+  tf[Terraform] -->|crée serveur + pare-feu| srv[Serveur]
+  ans[Ansible] -->|déploie compose| srv
+  srv --> app[FastAPI] --> pg[(PostgreSQL)]
+  prom[Prometheus] -->|/metrics| app
+  graf[Grafana] --> prom
+```
+
+Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Politique de sécurité : [SECURITY.md](SECURITY.md) ·
+Fiche d'entretien : [docs/EXPLICATIONS.md](docs/EXPLICATIONS.md).
+
+## API
 
 | Route | Rôle |
 |---|---|
-| `POST /api/links` | Crée un lien court (code généré ou personnalisé) |
+| `POST /api/links` | Crée un lien court (code généré ou personnalisé). Exige `X-API-Key`. |
 | `GET /{code}` | Redirige (302) vers l'URL d'origine et compte le clic |
-| `GET /api/links/{code}` | Statistiques du lien (nombre de clics) |
-| `GET /healthz` | Sonde de santé (vérifie aussi la base) |
+| `GET /api/links/{code}` | Statistiques du lien |
+| `GET /healthz` | Liveness : le processus répond (sans base) |
+| `GET /readyz` | Readiness : la base répond |
 | `GET /metrics` | Métriques Prometheus |
 
 ## Lancer le projet
@@ -27,24 +48,51 @@ pytest
 uvicorn app.main:app --reload
 ```
 
-Avec Docker (application + PostgreSQL) :
+Avec Docker (application + PostgreSQL, migrations appliquées au démarrage) :
 
 ```bash
 docker compose up --build
-curl -X POST localhost:8000/api/links -H 'content-type: application/json' -d '{"url":"https://example.com"}'
+curl -X POST localhost:8000/api/links -H 'content-type: application/json' \
+  -H 'X-API-Key: cle-dev-locale' -d '{"url":"https://example.com"}'
 ```
+
+Avec la supervision (Prometheus sur :9090, Grafana sur :3000) :
+
+```bash
+docker compose --profile monitoring up --build
+```
+
+## Qualité et sécurité (ce que la CI exécute)
+
+```bash
+ruff check . && ruff format --check .   # lint et format
+pytest                                   # tests + couverture (seuil 90 %)
+bandit -r app                            # analyse statique de sécurité
+pip-audit -r requirements.txt            # vulnérabilités des dépendances
+```
+
+Dans la CI s'ajoutent : tests sur un vrai PostgreSQL, CodeQL, scan Trivy de l'image et de la configuration,
+test de bout en bout via `docker compose`, publication de l'image sur GHCR (branche `main`), validation Ansible et Terraform.
+
+## Déploiement
+
+1. `infra/terraform` crée un serveur et un pare-feu (exemple Hetzner Cloud ; jeton fourni par variable d'environnement).
+2. `infra/ansible` installe Docker, configure le pare-feu, dépose les secrets (fichier `.env` en 0600, valeurs chiffrées avec Ansible Vault) et lance la pile.
+
+Ces fichiers sont validés par la CI (`terraform validate`, `ansible-lint`) mais ne sont **pas encore appliqués sur un vrai serveur**.
 
 ## Choix techniques
 
-- **FastAPI + SQLAlchemy** : API typée, validation automatique des entrées, documentation OpenAPI sur `/docs`.
-- **Sécurité des entrées** : seules les URL `http` et `https` sont acceptées (refus de `javascript:`, `file:`, etc.), codes réservés interdits, longueur limitée.
-- **Codes aléatoires** avec le module `secrets` (non prévisibles), gestion des collisions par nouvelle tentative.
-- **Compteur de clics atomique** (`UPDATE ... SET clicks = clicks + 1`) : pas de perte en cas d'accès concurrents.
-- **Redirection 302** et non 301 : un 301 serait mis en cache par le navigateur et les clics ne seraient plus comptés.
-- **Image Docker** en deux étapes, base `python:3.13-slim`, utilisateur non root, `HEALTHCHECK` intégré.
-- **Configuration par variables d'environnement** (principe 12-factor) : aucun secret dans le code ni dans l'image.
+- **FastAPI + SQLAlchemy 2** : API typée, validation automatique, OpenAPI sur `/docs`.
+- **Alembic** : le schéma est versionné ; l'image applique les migrations au démarrage.
+- **Entrées** : seules les URL `http`/`https`, codes réservés interdits, domaines bloqués configurables.
+- **Compteur de clics atomique** (`UPDATE ... SET clicks = clicks + 1`), testé en concurrence sur PostgreSQL.
+- **302 et non 301** : un 301 serait mis en cache et les clics ne seraient plus comptés.
+- **Observabilité** : journaux JSON, `X-Request-ID`, métriques par route (gabarit, pas l'URL brute), alertes Prometheus.
+- **12-factor** : configuration par variables d'environnement, échec au démarrage en production si la configuration est dangereuse.
 
-## Limites connues (et pistes)
+## Limites connues
 
-- Pas de migrations de base : les tables sont créées au démarrage. En production : Alembic.
-- Pas de limitation de débit : en production, à placer devant (reverse proxy) ou via un middleware.
+- Limiteur de débit en mémoire (une seule instance) ; plusieurs instances demanderaient Redis.
+- Une clé API partagée, pas de comptes utilisateurs.
+- Infrastructure en code non appliquée en conditions réelles.

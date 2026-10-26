@@ -1,0 +1,45 @@
+{
+  "title": "URL Shortener",
+  "uid": "shortener",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Liens créés (total)",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum(shortener_links_created_total)", "refId": "A"}]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Redirections réussies (total)",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum(shortener_redirects_total{result=\"hit\"})", "refId": "A"}]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Taux d'erreurs 5xx (5 min)",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}},
+      "targets": [{"expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1)", "refId": "A"}]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Requêtes par seconde (par route)",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by (route) (rate(http_requests_total[1m]))", "legendFormat": "{{route}}", "refId": "A"}]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Latence p50 / p95",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95", "refId": "B"}
+      ]
+    }
+  ]
+}
