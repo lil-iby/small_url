@@ -1,0 +1,68 @@
+---
+# Déploiement du raccourcisseur d'URL sur un serveur Debian/Ubuntu.
+# Usage : ansible-playbook -i inventory.ini playbook.yml --ask-vault-pass
+- name: Déployer le raccourcisseur d'URL
+  hosts: shortener
+  become: true
+  vars_files:
+    - vars.example.yml  # à remplacer par un fichier chiffré : ansible-vault encrypt vars.yml
+  tasks:
+    - name: Installer les paquets nécessaires
+      ansible.builtin.apt:
+        name: [docker.io, docker-compose-v2, ufw]
+        state: present
+        update_cache: true
+
+    - name: Activer et démarrer Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Autoriser SSH, HTTP et HTTPS dans le pare-feu
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: ["22", "80", "443"]
+
+    - name: Refuser tout le reste en entrée
+      community.general.ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: Créer le dossier de l'application
+      ansible.builtin.file:
+        path: /opt/shortener
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Copier le fichier docker-compose
+      ansible.builtin.copy:
+        src: ../../docker-compose.yml
+        dest: /opt/shortener/docker-compose.yml
+        owner: root
+        group: root
+        mode: "0640"
+
+    - name: Écrire le fichier d'environnement (secrets)
+      ansible.builtin.copy:
+        dest: /opt/shortener/.env
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          ENVIRONMENT=production
+          BASE_URL={{ shortener_base_url }}
+          API_KEYS={{ shortener_api_keys }}
+          POSTGRES_PASSWORD={{ shortener_db_password }}
+      no_log: true
+
+    - name: Lancer la pile
+      ansible.builtin.command:
+        cmd: docker compose up -d --build --wait
+        chdir: /opt/shortener
+      changed_when: true

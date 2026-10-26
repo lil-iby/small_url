@@ -16,13 +16,44 @@ services:
   app:
     build: .
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
       DATABASE_URL: postgresql+psycopg://shortener:${POSTGRES_PASSWORD:-shortener_dev_only}@db:5432/shortener
       BASE_URL: ${BASE_URL:-http://localhost:8000}
+      API_KEYS: ${API_KEYS:-cle-dev-locale}
+      BLOCKED_DOMAINS: ${BLOCKED_DOMAINS:-}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  # Supervision : `docker compose --profile monitoring up`
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on: [app]
+
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:12.1.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin_dev_only}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
 
 volumes:
   pgdata:

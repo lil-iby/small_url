@@ -1,0 +1,26 @@
+groups:
+  - name: shortener
+    rules:
+      - alert: ShortenerDown
+        expr: up{job="shortener"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "L'application ne répond plus au scrape Prometheus"
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total[5m])), 1) > 0.05
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Plus de 5 % de réponses 5xx sur 5 minutes"
+
+      - alert: SlowRequests
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Le 95e centile de latence dépasse 500 ms"

@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator
 
 # Codes qui entreraient en collision avec les routes de l'application.
-RESERVED_CODES = {"api", "healthz", "metrics", "docs", "redoc", "openapi.json"}
+RESERVED_CODES = {"api", "healthz", "readyz", "metrics", "docs", "redoc", "openapi.json"}
 CODE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,32}$")
 
 
