@@ -6,8 +6,6 @@ code testé, sécurisé, conteneurisé, supervisé, avec pipeline CI/CD et infra
 ![CI](../../actions/workflows/ci.yml/badge.svg)
 ![CodeQL](../../actions/workflows/codeql.yml/badge.svg)
 
-> Remplacer `../..` par `https://github.com/<utilisateur>/<depot>` si les badges ne s'affichent pas hors GitHub.
-
 ## Vue d'ensemble
 
 ```mermaid
